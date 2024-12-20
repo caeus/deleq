@@ -1,36 +1,41 @@
 type ValBinding = {
   type: 'val';
   id: string;
-  to: Expr;
+  to: Expr0;
 };
 type FunBinding = {
   type: 'fun';
   id: string;
   params: string[];
-  body: Expr;
+  body: Expr0;
 };
 type Binding = ValBinding | FunBinding;
 
-type Expr =
-  | { type: 'id'; id: string }
+type Expr0 =
+  | { type: 'text'; value: string }
+  | {
+      type: 'ref';
+      to: string;
+    }
   | {
       type: 'fun';
       params: string[];
-      body: Expr;
+      body: Expr0;
     }
   | {
       type: 'block';
       bindings: Binding[];
-      result: Expr;
+      result: Expr0;
     }
   | {
-      type: 'deleq';
-      args: Expr[];
+      type: 'do';
+      tag: string;
+      args: Expr0[];
     }
   | {
       type: 'apply';
-      fun: Expr;
-      args: Expr[];
+      fun: Expr0;
+      args: Expr0[];
     };
 
-export { Binding, FunBinding, ValBinding, Expr };
+export { Binding, Expr0, FunBinding, ValBinding };

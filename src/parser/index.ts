@@ -1,4 +1,4 @@
-import { Binding, Expr, FunBinding, ValBinding } from '@/ast/expr0';
+import { Binding, Expr0, FunBinding, ValBinding } from '@/ast/expr0';
 import { Token } from '@/lexer';
 import { Parser, Rule } from 'gramr-ts';
 
@@ -18,7 +18,6 @@ const token = <Type extends TokenType>(
   type: Type,
 ): Rule<Token, TokenCase<Type>> =>
   Rule.nextAs((token: Token) => {
-    console.log(token);
     if (token.type == type) {
       return {
         accepted: true,
@@ -30,16 +29,28 @@ const token = <Type extends TokenType>(
     .let(Rule.path(type))
     .let(Rule.log);
 
-const expr: TRule<Expr> = Rule.lazy(() => postfix_expr);
+const expr: TRule<Expr0> = Rule.lazy(() => postfix_expr);
 
 const id = token('id');
-const id_expr: TRule<Expr> = id.let(Rule.map((t) => t satisfies Expr as Expr));
+const ref_expr: TRule<Expr0> = id.let(
+  Rule.map(
+    (t) =>
+      ({
+        type: 'ref',
+        to: t.id,
+      }) satisfies Expr0 as Expr0,
+  ),
+);
 const fun = token('fun');
-const deleq = token('deleq');
+const do$ = token('do');
 const val = token('val');
 const comma = token('comma');
 const semicolon = token('semicolon');
 const eq = token('eq');
+const text = token('text');
+const text_expr: TRule<Expr0> = text.let(
+  Rule.map((token) => token satisfies Expr0),
+);
 const delimiters = <Brace extends TokenBrace>(brace: Brace) =>
   [token(`open_${brace}`), token(`close_${brace}`)] as const;
 const parens = delimiters('paren');
@@ -49,25 +60,24 @@ const fun_params: TRule<string[]> = id
   .let(Rule.map((ps) => ps.map((p) => p.id)))
   .let(Parser.enclose(...parens));
 
-const fun_args: TRule<Expr[]> = expr
+const fun_args: TRule<Expr0[]> = expr
   .let(Rule.collect({ sep: comma }))
   .let(Parser.enclose(...parens));
 
-const fun_expr: TRule<Expr> = chain()
+const fun_expr: TRule<Expr0> = chain()
   //
   .skip(fun)
   .push(fun_params)
   .skip(eq)
   .push(expr)
   .done.let(
-    Rule.map(
-      ([params, body]) =>
-        ({
-          type: 'fun',
-          params,
-          body,
-        }) satisfies Expr as Expr,
-    ),
+    Rule.map(([params, body]) => {
+      return {
+        type: 'fun',
+        params,
+        body,
+      } satisfies Expr0 as Expr0;
+    }),
   )
   .let(Rule.path('fun'))
   .let(Rule.log);
@@ -109,7 +119,7 @@ const fun_binding = chain()
   .let(Rule.path('fun_binding'))
   .let(Rule.log);
 const binding: TRule<Binding> = Rule.fork(val_binding, fun_binding);
-const block_expr: TRule<Expr> = Parser.enclose(...curlys)(
+const block_expr: TRule<Expr0> = Parser.enclose(...curlys)(
   chain()
     .push(
       chain()
@@ -133,7 +143,7 @@ const block_expr: TRule<Expr> = Parser.enclose(...curlys)(
             type: 'block',
             bindings: bindings || [],
             result,
-          }) satisfies Expr as Expr,
+          }) satisfies Expr0 as Expr0,
       ),
     )
     .let(Rule.path('block'))
@@ -142,36 +152,42 @@ const block_expr: TRule<Expr> = Parser.enclose(...curlys)(
 const grouped_expr = Parser.enclose(...parens)(expr)
   .let(Rule.path('postfix'))
   .let(Rule.log);
-const deleq_expr: TRule<Expr> = chain()
-  .skip(deleq)
+const do_expr: TRule<Expr0> = chain()
+  .skip(do$)
+  .push(text)
   .push(fun_args)
-  .done.let(Rule.first)
-  .let(Rule.map((args) => ({ type: 'deleq', args }) satisfies Expr as Expr))
+  .done.let(
+    Rule.map(
+      ([tag, args]) =>
+        ({ type: 'do', tag: tag.value, args }) satisfies Expr0 as Expr0,
+    ),
+  )
   .let(Rule.log);
-const atomic_expr: TRule<Expr> = Rule.fork(
-  id_expr,
+const atomic_expr: TRule<Expr0> = Rule.fork(
+  ref_expr,
   fun_expr,
   grouped_expr,
   block_expr,
-  deleq_expr,
+  do_expr,
+  text_expr,
 );
-type PostfixSuffix = (expr: Expr) => Expr;
+type PostfixSuffix = (expr: Expr0) => Expr0;
 const apply_suffix = fun_args.let(
   Rule.map(
     (args) =>
-      (fun: Expr): Expr =>
+      (fun: Expr0): Expr0 =>
         ({
           type: 'apply',
           fun,
           args,
-        }) satisfies Expr as Expr,
+        }) satisfies Expr0 as Expr0,
   ),
 );
 const postfix_suffix: TRule<PostfixSuffix> = apply_suffix.let(Rule.unfinished);
 const postfix_suffixes: TRule<PostfixSuffix> = postfix_suffix
   .let(Rule.collect())
   .let(
-    Rule.map((suffixes) => (expr: Expr) => {
+    Rule.map((suffixes) => (expr: Expr0) => {
       let result = expr;
       for (const suffix of suffixes) {
         result = suffix(expr);
@@ -180,7 +196,7 @@ const postfix_suffixes: TRule<PostfixSuffix> = postfix_suffix
     }),
   )
   .let(Rule.log);
-const postfix_expr: TRule<Expr> = chain()
+const postfix_expr: TRule<Expr0> = chain()
   .push(atomic_expr)
   .push(postfix_suffixes)
   .done.let(Rule.map(([expr, suffix]) => suffix(expr)))
@@ -189,7 +205,7 @@ const postfix_expr: TRule<Expr> = chain()
   .let(Rule.log);
 const parser = chain()
   .push(expr)
-  .skip(Rule.end())
+  .skip(Rule.end)
   .done.let(Rule.first)
   .let(Rule.log);
 export { parser };

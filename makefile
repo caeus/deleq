@@ -12,7 +12,7 @@ format: install
 docs: install lint
 	npm run docs
 
-build: install lint
+build: install lint test
 	npm run build
 
 test: lint

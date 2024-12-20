@@ -37,6 +37,6 @@
     "vitest": "^2.1.5"
   },
   "dependencies": {
-    "gramr-ts": "^1.0.9-rc14"
+    "gramr-ts": "^1.0.9-rc20"
   }
 }
